@@ -22,6 +22,7 @@ const PROVIDERS_WITH_MODEL_SETTINGS = [
     "google",
     "perplexity",
     "grok",
+    "deepseek",
 ];
 
 export default function ApiKeysForm({
@@ -74,6 +75,12 @@ export default function ApiKeysForm({
             name: "Moonshot AI (Kimi)",
             placeholder: "sk-...",
             url: "https://platform.moonshot.ai/console/api-keys",
+        },
+        {
+            id: "deepseek",
+            name: "DeepSeek",
+            placeholder: "sk-...",
+            url: "https://platform.deepseek.com/api_keys",
         },
         {
             id: "firecrawl",

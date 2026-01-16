@@ -510,6 +510,7 @@ export function ManageModelsBox({
             "perplexity",
             "grok",
             "kimi",
+            "deepseek",
         ] as const;
 
         const directByProvider = Object.fromEntries(
@@ -827,6 +828,18 @@ export function ManageModelsBox({
                                     <span className="text-sm">Refresh</span>
                                 </button>
                             }
+                        />
+                    )}
+                    {modelGroups.directByProvider.deepseek.length > 0 && (
+                        <ModelGroup
+                            heading="DeepSeek"
+                            models={modelGroups.directByProvider.deepseek}
+                            checkedModelConfigIds={checkedModelConfigIds}
+                            mode={mode}
+                            onToggleModelConfig={handleToggleModelConfig}
+                            onAddApiKey={handleAddApiKey}
+                            groupId="deepseek"
+                            showCost={showCost}
                         />
                     )}
                     {modelGroups.directByProvider.perplexity.length > 0 && (

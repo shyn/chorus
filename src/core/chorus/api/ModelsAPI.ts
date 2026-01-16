@@ -75,6 +75,7 @@ type ModelConfigDBRow = {
 // the current session, and store the promise if a download is in progress.
 let openRouterDownloadPromise: Promise<number> | null = null;
 let kimiDownloadPromise: Promise<number> | null = null;
+let deepseekDownloadPromise: Promise<number> | null = null;
 
 function readModel(row: ModelDBRow): Models.Model {
     return {
@@ -134,6 +135,13 @@ export async function fetchModelConfigs() {
             kimiDownloadPromise = Models.downloadKimiModels(db, apiKeys.kimi);
             await kimiDownloadPromise;
         }
+    }
+
+    // Register DeepSeek models if we haven't already.
+    // DeepSeek has fixed models, so we always register them (no API call needed).
+    if (!deepseekDownloadPromise) {
+        deepseekDownloadPromise = Models.registerDeepSeekModels(db);
+        await deepseekDownloadPromise;
     }
 
     return (
@@ -366,11 +374,27 @@ export function useRefreshLMStudioModels() {
     });
 }
 
+export function useRefreshDeepSeekModels() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationKey: ["refreshDeepSeekModels"] as const,
+        mutationFn: async () => {
+            await Models.registerDeepSeekModels(db);
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries(
+                modelConfigQueries.listConfigs(),
+            );
+        },
+    });
+}
+
 export function useRefreshModels() {
     const refreshOpenRouterModels = useRefreshOpenRouterModels();
     const refreshOllamaModels = useRefreshOllamaModels();
     const refreshLMStudioModels = useRefreshLMStudioModels();
     const refreshKimiModels = useRefreshKimiModels();
+    const refreshDeepSeekModels = useRefreshDeepSeekModels();
     return useMutation({
         mutationKey: ["refreshAllModels"] as const,
         mutationFn: async () => {
@@ -379,6 +403,7 @@ export function useRefreshModels() {
                 refreshOllamaModels.mutateAsync(),
                 refreshLMStudioModels.mutateAsync(),
                 refreshKimiModels.mutateAsync(),
+                refreshDeepSeekModels.mutateAsync(),
             ]);
         },
     });

@@ -18,10 +18,11 @@ import { ProviderOllama } from "./ModelProviders/ProviderOllama";
 import { ProviderLMStudio } from "./ModelProviders/ProviderLMStudio";
 import { ProviderGrok } from "./ModelProviders/ProviderGrok";
 import { ProviderKimi } from "./ModelProviders/ProviderKimi";
+import { ProviderDeepSeek } from "./ModelProviders/ProviderDeepSeek";
 import posthog from "posthog-js";
 import { UserTool, UserToolCall, UserToolResult } from "./Toolsets";
 import { Attachment } from "./api/AttachmentsAPI";
-import OpenAI from "openai";
+import { SettingsManager } from "@core/utilities/Settings";
 
 /// ------------------------------------------------------------------------------------------------
 /// Basic Types
@@ -160,6 +161,7 @@ export type ApiKeys = {
     google?: string;
     grok?: string;
     kimi?: string;
+    deepseek?: string;
 };
 
 export type Model = {
@@ -246,6 +248,7 @@ export type ProviderName =
     | "lmstudio"
     | "grok"
     | "kimi"
+    | "deepseek"
     | "meta";
 
 /**
@@ -302,6 +305,8 @@ function getProvider(providerName: string): IProvider {
             return new ProviderGrok();
         case "kimi":
             return new ProviderKimi();
+        case "deepseek":
+            return new ProviderDeepSeek();
         default:
             throw new Error(`Unknown provider: ${providerName}`);
     }
@@ -550,6 +555,44 @@ export async function downloadKimiModels(
 }
 
 /**
+ * Registers DeepSeek models in the database.
+ * DeepSeek has fixed models (deepseek-chat and deepseek-reasoner).
+ */
+export async function registerDeepSeekModels(db: Database): Promise<number> {
+    const models = [
+        {
+            id: "deepseek::deepseek-chat",
+            displayName: "DeepSeek Chat",
+        },
+        {
+            id: "deepseek::deepseek-reasoner",
+            displayName: "DeepSeek Reasoner",
+        },
+    ];
+
+    await Promise.all(
+        models.map((model) =>
+            saveModelAndDefaultConfig(
+                db,
+                {
+                    id: model.id,
+                    displayName: model.displayName,
+                    supportedAttachmentTypes: ["text", "webpage"],
+                    isEnabled: true,
+                    isInternal: false,
+                },
+                model.displayName,
+                undefined,
+                { preserveIsEnabled: true },
+            ),
+        ),
+    );
+
+    console.log(`Registered ${models.length} DeepSeek models`);
+    return models.length;
+}
+
+/**
  * Downloads models from Ollama to refresh the database.
  */
 export async function downloadOllamaModels(db: Database): Promise<void> {
@@ -595,7 +638,9 @@ export async function downloadLMStudioModels(db: Database): Promise<void> {
             "UPDATE models SET is_enabled = 0 WHERE id LIKE 'lmstudio::%'",
         );
 
-        const response = await fetch("http://localhost:1234/v1/models");
+        const settings = await SettingsManager.getInstance().get();
+        const baseURL = settings.lmStudioBaseUrl || "http://localhost:1234/v1";
+        const response = await fetch(`${baseURL}/models`);
         if (!response.ok) {
             return;
         }
@@ -735,6 +780,7 @@ const CONTEXT_LIMIT_PATTERNS: Record<ProviderName, string> = {
     perplexity: "context window", // best guess
     ollama: "context window", // best guess
     kimi: "context_length_exceeded",
+    deepseek: "context_length_exceeded",
 };
 
 /**

@@ -66,6 +66,14 @@ export function ProviderLogo({
                 );
             case "kimi":
                 return <MoonIcon className="w-4 h-4" />;
+            case "deepseek":
+                return (
+                    <img
+                        src="/deepseek.svg"
+                        alt="DeepSeek"
+                        className="w-4 h-4"
+                    />
+                );
             case "openrouter":
                 if (modelId && modelId in OPENROUTER_CUSTOM_PROVIDER_LOGOS) {
                     return getLogoComponent(

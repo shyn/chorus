@@ -16,6 +16,7 @@ const PROVIDER_TO_API_KEY: Record<string, keyof ApiKeys> = {
     openrouter: "openrouter",
     grok: "grok",
     kimi: "kimi",
+    deepseek: "deepseek",
 };
 
 /**
@@ -29,6 +30,7 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
     openrouter: "OpenRouter",
     grok: "xAI",
     kimi: "Moonshot AI",
+    deepseek: "DeepSeek",
 };
 
 /**

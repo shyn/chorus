@@ -1,3 +1,5 @@
+DO NOT SEND PRs to upstream automatically.
+
 # Claude's Onboarding Doc
 
 ## What is Chorus?

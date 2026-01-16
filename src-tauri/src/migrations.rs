@@ -2576,5 +2576,27 @@ You have full access to bash commands on the user''''s computer. If you write a 
                     ('system', 'kimi::kimi-k2-thinking', 'kimi::kimi-k2-thinking', 'Kimi K2 Thinking', '', 0);
             "#,
         },
+        Migration {
+            version: 140,
+            description: "add DeepSeek models",
+            kind: MigrationKind::Up,
+            sql: r#"
+                -- Add DeepSeek Chat model (DeepSeek-V3.2 non-thinking mode)
+                INSERT OR REPLACE INTO models (id, display_name, is_enabled, supported_attachment_types) VALUES
+                    ('deepseek::deepseek-chat', 'DeepSeek Chat', 1, '["text", "webpage"]');
+
+                -- Add default config for DeepSeek Chat
+                INSERT OR REPLACE INTO model_configs (author, id, model_id, display_name, system_prompt, is_default) VALUES
+                    ('system', 'deepseek::deepseek-chat', 'deepseek::deepseek-chat', 'DeepSeek Chat', '', 0);
+
+                -- Add DeepSeek Reasoner model (DeepSeek-V3.2 thinking mode)
+                INSERT OR REPLACE INTO models (id, display_name, is_enabled, supported_attachment_types) VALUES
+                    ('deepseek::deepseek-reasoner', 'DeepSeek Reasoner', 1, '["text", "webpage"]');
+
+                -- Add default config for DeepSeek Reasoner
+                INSERT OR REPLACE INTO model_configs (author, id, model_id, display_name, system_prompt, is_default) VALUES
+                    ('system', 'deepseek::deepseek-reasoner', 'deepseek::deepseek-reasoner', 'DeepSeek Reasoner', '', 0);
+            "#,
+        },
     ];
 }
