@@ -97,6 +97,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ManageModelsBox } from "./ManageModelsBox";
 import RepliesDrawer from "./RepliesDrawer";
 import useElementScrollDetection from "@ui/hooks/useScrollDetection";
+import { platform } from "@tauri-apps/plugin-os";
 import { checkScreenRecordingPermission } from "tauri-plugin-macos-permissions-api";
 import { dialogActions } from "@core/infra/DialogStore";
 import { ANTHROPIC_IMPORT_PREFIX } from "@core/chorus/importers/AnthropicImporter";
@@ -2004,7 +2005,11 @@ export default function MultiChat() {
     // useShortcut(["shift", "tab"], () => handleTabKey(true));
 
     const handleToggleVisionMode = useCallback(async () => {
-        const hasPermissions = await checkScreenRecordingPermission();
+        const currentPlatform = platform();
+        const hasPermissions =
+            currentPlatform === "macos"
+                ? await checkScreenRecordingPermission()
+                : true;
         const visionModeEnabled = appMetadata["vision_mode_enabled"] === "true";
 
         if (!visionModeEnabled && !hasPermissions) {

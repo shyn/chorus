@@ -143,8 +143,12 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_macos_permissions::init());
+        .plugin(tauri_plugin_shell::init());
+
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.plugin(tauri_plugin_macos_permissions::init());
+    }
 
     #[cfg(debug_assertions)]
     {
@@ -395,8 +399,192 @@ pub fn run() {
     };
 
     #[cfg(not(target_os = "macos"))]
-    let setup_fn = move |_app: &mut tauri::App| {
-        // No macOS-specific setup needed for other platforms
+    let setup_fn = move |app: &mut tauri::App| {
+        let handle = app.app_handle();
+
+        // Create the application menu using Tauri v2 API
+        let app_menu = SubmenuBuilder::new(app, "Chorus")
+            .item(&MenuItem::with_id(
+                app,
+                "about-chorus",
+                "About Chorus",
+                true,
+                None::<&str>,
+            )?)
+            .separator()
+            .item(&MenuItem::with_id(
+                app,
+                "settings",
+                "Settings",
+                true,
+                Some("Ctrl+,"),
+            )?)
+            .separator()
+            .item(&PredefinedMenuItem::quit(app, None)?)
+            .build()?;
+
+        // Create Edit menu
+        let edit_menu = SubmenuBuilder::new(app, "Edit")
+            .item(&PredefinedMenuItem::undo(app, None)?)
+            .item(&PredefinedMenuItem::redo(app, None)?)
+            .separator()
+            .item(&PredefinedMenuItem::cut(app, None)?)
+            .item(&PredefinedMenuItem::copy(app, None)?)
+            .item(&PredefinedMenuItem::paste(app, None)?)
+            .item(&PredefinedMenuItem::select_all(app, None)?)
+            .build()?;
+
+        // Create View menu
+        let view_menu = SubmenuBuilder::new(app, "View")
+            .item(&PredefinedMenuItem::fullscreen(app, None)?)
+            .build()?;
+
+        // Create Window menu
+        let window_menu = SubmenuBuilder::new(app, "Window")
+            .item(&PredefinedMenuItem::minimize(app, None)?)
+            .item(&PredefinedMenuItem::maximize(app, None)?)
+            .separator()
+            .item(&PredefinedMenuItem::close_window(app, None)?)
+            .build()?;
+
+        // Create Shortcuts menu
+        let shortcuts_menu = SubmenuBuilder::new(app, "Shortcuts")
+            .separator()
+            .item(&MenuItem::with_id(
+                app,
+                "new-chat",
+                "New chat",
+                true,
+                Some("Ctrl+N"),
+            )?)
+            .item(&MenuItem::with_id(
+                app,
+                "new-project",
+                "New project",
+                true,
+                Some("Ctrl+Shift+N"),
+            )?)
+            .separator()
+            .item(&MenuItem::with_id(
+                app,
+                "settings-shortcut",
+                "Settings",
+                true,
+                Some("Ctrl+,"),
+            )?)
+            .build()?;
+
+        // Create Updates menu
+        let updates_menu = SubmenuBuilder::new(app, "Updates")
+            .item(&MenuItem::with_id(
+                app,
+                "changelog",
+                "Changelog",
+                true,
+                None::<&str>,
+            )?)
+            .build()?;
+
+        // Build the complete menu
+        let menu = MenuBuilder::new(app)
+            .item(&app_menu)
+            .item(&edit_menu)
+            .item(&view_menu)
+            .item(&window_menu)
+            .item(&shortcuts_menu)
+            .item(&updates_menu)
+            .build()?;
+
+        // Set as app menu
+        app.set_menu(menu)?;
+
+        // Setup tray
+        let _tray = TrayIconBuilder::new()
+            .icon(app.default_window_icon().unwrap().clone())
+            .on_tray_icon_event(|tray, event| match event {
+                TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseButtonState::Up,
+                    ..
+                } => {
+                    let app = tray.app_handle();
+                    if let Some(window) = app.get_webview_window(SPOTLIGHT_LABEL) {
+                        if window.is_visible().unwrap_or(false) {
+                            command::hide(app.clone());
+                        } else {
+                            command::show(app.clone());
+                        }
+                    }
+                }
+                _ => {}
+            })
+            .build(app)?;
+
+        // Read the quickChat shortcut from the settings store.
+        let store = app.store("settings");
+        let quick_chat_shortcut = store
+            .ok()
+            .and_then(|store| store.get("settings"))
+            .and_then(|settings| {
+                settings
+                    .as_object()
+                    .and_then(|s| s.get("quickChat"))
+                    .and_then(|t| t.get("shortcut"))
+                    .and_then(|m| m.as_str().map(String::from))
+            })
+            .unwrap_or("Alt+Space".to_string());
+
+        let shortcut = parse_shortcut(&quick_chat_shortcut)
+            .unwrap_or(Shortcut::new(Some(Modifiers::ALT), Code::Space));
+
+        let cloned_handle = handle.clone();
+
+        // Register the quickChat shortcut.
+        app.handle().plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_shortcuts([shortcut])
+                .expect("Failed to register shortcut")
+                .with_handler(move |app, shortcut, event| {
+                    if event.state == ShortcutState::Pressed && event.id == shortcut.id() {
+                        let store = app.store("settings");
+                        let quick_chat_enabled = store
+                            .ok()
+                            .and_then(|store| store.get("settings"))
+                            .and_then(|settings| {
+                                settings
+                                    .as_object()
+                                    .and_then(|s| s.get("quickChat"))
+                                    .and_then(|t| t.get("enabled"))
+                                    .and_then(|e| e.as_bool())
+                            })
+                            .unwrap_or(false);
+                        if quick_chat_enabled {
+                            if let Some(window) = app.get_webview_window(SPOTLIGHT_LABEL) {
+                                if window.is_visible().unwrap_or(false) {
+                                    let _ = window.hide();
+                                } else {
+                                    let handle = app.app_handle();
+                                    handle.emit("show_quick_chat", ()).unwrap();
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                }
+                            }
+                        }
+                    }
+                })
+                .build(),
+        )?;
+
+        // Emit focus event when quick-chat window gains focus
+        if let Some(window) = handle.get_webview_window(SPOTLIGHT_LABEL) {
+            let cloned_handle2 = cloned_handle.clone();
+            window.on_window_event(move |event| {
+                if let tauri::WindowEvent::Focused(true) = event {
+                    cloned_handle2.emit("quick-chat-focused", ()).unwrap();
+                }
+            });
+        }
+
         Ok(())
     };
 

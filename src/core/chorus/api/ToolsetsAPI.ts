@@ -4,6 +4,7 @@ import { CustomToolsetConfig, ToolPermissionType } from "../Toolsets";
 import { ToolsetsManager } from "../ToolsetsManager";
 import { homeDir, join } from "@tauri-apps/api/path";
 import { exists, readTextFile } from "@tauri-apps/plugin-fs";
+import { platform } from "@tauri-apps/plugin-os";
 
 export const toolsetsKeys = {
     // toolset configs
@@ -282,14 +283,32 @@ export function useImportFromClaudeDesktop() {
         mutationKey: ["importFromClaudeDesktop"] as const,
         mutationFn: async () => {
             // Determine the path to Claude Desktop MCP config based on platform
-            // Note: this will only work on macOS
-            const configPath = await join(
-                await homeDir(),
-                "Library",
-                "Application Support",
-                "claude",
-                "claude_desktop_config.json",
-            );
+            const currentPlatform = platform();
+            let configPath: string;
+
+            if (currentPlatform === "macos") {
+                configPath = await join(
+                    await homeDir(),
+                    "Library",
+                    "Application Support",
+                    "claude",
+                    "claude_desktop_config.json",
+                );
+            } else if (currentPlatform === "windows") {
+                // On Windows, Claude Desktop config is at %APPDATA%\Claude\claude_desktop_config.json
+                // homeDir() returns C:\Users\<username>, APPDATA is C:\Users\<username>\AppData\Roaming
+                configPath = await join(
+                    await homeDir(),
+                    "AppData",
+                    "Roaming",
+                    "Claude",
+                    "claude_desktop_config.json",
+                );
+            } else {
+                throw new Error(
+                    `Unsupported platform: ${currentPlatform}. Claude Desktop import is only supported on macOS and Windows.`,
+                );
+            }
 
             // Check if the config file exists
             const fileExists = await exists(configPath);

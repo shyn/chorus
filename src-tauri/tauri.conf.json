@@ -60,6 +60,11 @@
         ],
         "macOS": {
             "entitlements": "macos.entitlements"
+        },
+        "windows": {
+            "webviewInstallMode": {
+                "type": "downloadBootstrapper"
+            }
         }
     },
     "plugins": {

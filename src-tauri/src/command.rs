@@ -143,9 +143,51 @@ pub fn capture_window() -> Result<String, String> {
 #[tauri::command]
 #[cfg(not(target_os = "macos"))]
 pub fn capture_window() -> Result<String, String> {
-    // For non-macOS platforms, just capture the active window
-    // This is a placeholder - you may want to implement platform-specific window capture
-    Err("Window capture not implemented for this platform".to_string())
+    use image::{DynamicImage, ImageBuffer};
+    use std::time::Instant;
+
+    let start_time = Instant::now();
+    println!("Starting window capture...");
+
+    let screens = Screen::all().map_err(|e| e.to_string())?;
+    let screen = screens.first().ok_or("No screen found")?;
+
+    let capture_time = Instant::now();
+    let image = screen.capture().map_err(|e| e.to_string())?;
+    println!("Raw capture completed in: {:?}", capture_time.elapsed());
+
+    let width = image.width();
+    let height = image.height();
+    let pixels = image.as_raw();
+
+    let temp_dir = std::env::temp_dir();
+    let raw_screenshot_path = temp_dir.join("screenshot_raw.png");
+
+    let img_buffer = ImageBuffer::from_raw(width, height, pixels.to_vec())
+        .ok_or("Failed to create image buffer")?;
+
+    let dynamic_image = DynamicImage::ImageRgba8(img_buffer);
+    dynamic_image
+        .save(&raw_screenshot_path)
+        .map_err(|e| e.to_string())?;
+
+    let resized_path = resize_image(
+        raw_screenshot_path.to_string_lossy().to_string(),
+        TARGET_SIZE_BYTES,
+    )?;
+
+    let image_data = std::fs::read(&resized_path).map_err(|e| e.to_string())?;
+
+    let _ = std::fs::remove_file(&raw_screenshot_path);
+    if resized_path != raw_screenshot_path.to_string_lossy().to_string() {
+        let _ = std::fs::remove_file(&resized_path);
+    }
+
+    println!(
+        "Total window capture process took: {:?}",
+        start_time.elapsed()
+    );
+    Ok(BASE64.encode(&image_data))
 }
 
 #[tauri::command]
@@ -714,9 +756,21 @@ pub fn open_screen_recording_settings() -> Result<(), String> {
         Ok(())
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
     {
-        Err("Opening screen recording settings is only supported on macOS".to_string())
+        use std::process::Command;
+
+        Command::new("cmd")
+            .args(["/C", "start", "ms-settings:privacy-broadcastinggamecapturing"])
+            .output()
+            .map_err(|e| e.to_string())?;
+
+        Ok(())
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        Err("Opening screen recording settings is not supported on this platform".to_string())
     }
 }
 

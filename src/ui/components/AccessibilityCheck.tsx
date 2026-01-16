@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@ui/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { BadgeCheck } from "lucide-react";
+import { platform } from "@tauri-apps/plugin-os";
 import { checkScreenRecordingPermission } from "tauri-plugin-macos-permissions-api";
 
 interface AccessibilityStatus {
@@ -18,6 +19,12 @@ export function AccessibilitySettings() {
 
     const checkSettings = async () => {
         try {
+            const currentPlatform = platform();
+            if (currentPlatform !== "macos") {
+                setSettings({ screen_recording: true });
+                setLoading(false);
+                return;
+            }
             const screenRecordingStatus =
                 await checkScreenRecordingPermission();
             setSettings({
